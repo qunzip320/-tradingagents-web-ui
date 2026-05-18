@@ -1,0 +1,32 @@
+# TradingAgents Web 依赖
+# 核心框架
+langchain-core>=0.3.81
+langchain-anthropic>=0.3.15
+langchain-experimental>=0.3.4
+langchain-google-genai>=4.0.0
+langchain-openai>=0.3.23
+langgraph>=0.4.8
+langgraph-checkpoint-sqlite>=2.0.0
+
+# 数据
+pandas>=2.3.0
+yfinance>=0.2.63
+stockstats>=0.6.5
+akshare>=1.10.0
+
+# 工具
+pytz>=2025.2
+requests>=2.32.4
+tqdm>=4.67.1
+typing-extensions>=4.14.0
+python-dotenv>=1.0.0
+setuptools>=80.9.0
+backtrader>=1.9.78.123
+parsel>=1.10.0
+redis>=6.2.0
+rich>=14.0.0
+
+# Web 服务
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+sse-starlette>=1.6.5

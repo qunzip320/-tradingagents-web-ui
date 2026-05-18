@@ -23,6 +23,17 @@ from .alpha_vantage import (
     get_global_news as get_alpha_vantage_global_news,
 )
 from .alpha_vantage_common import AlphaVantageRateLimitError
+from .akshare_data import (
+    get_stock as get_akshare_stock,
+    get_indicators as get_akshare_indicators,
+    get_fundamentals as get_akshare_fundamentals,
+    get_balance_sheet as get_akshare_balance_sheet,
+    get_cashflow as get_akshare_cashflow,
+    get_income_statement as get_akshare_income_statement,
+    get_insider_transactions as get_akshare_insider_transactions,
+    get_news as get_akshare_news,
+    get_global_news as get_akshare_global_news,
+)
 
 # Configuration and routing logic
 from .config import get_config
@@ -63,6 +74,7 @@ TOOLS_CATEGORIES = {
 VENDOR_LIST = [
     "yfinance",
     "alpha_vantage",
+    "akshare",
 ]
 
 # Mapping of methods to their vendor-specific implementations
@@ -71,41 +83,50 @@ VENDOR_METHODS = {
     "get_stock_data": {
         "alpha_vantage": get_alpha_vantage_stock,
         "yfinance": get_YFin_data_online,
+        "akshare": get_akshare_stock,
     },
     # technical_indicators
     "get_indicators": {
         "alpha_vantage": get_alpha_vantage_indicator,
         "yfinance": get_stock_stats_indicators_window,
+        "akshare": get_akshare_indicators,
     },
     # fundamental_data
     "get_fundamentals": {
         "alpha_vantage": get_alpha_vantage_fundamentals,
         "yfinance": get_yfinance_fundamentals,
+        "akshare": get_akshare_fundamentals,
     },
     "get_balance_sheet": {
         "alpha_vantage": get_alpha_vantage_balance_sheet,
         "yfinance": get_yfinance_balance_sheet,
+        "akshare": get_akshare_balance_sheet,
     },
     "get_cashflow": {
         "alpha_vantage": get_alpha_vantage_cashflow,
         "yfinance": get_yfinance_cashflow,
+        "akshare": get_akshare_cashflow,
     },
     "get_income_statement": {
         "alpha_vantage": get_alpha_vantage_income_statement,
         "yfinance": get_yfinance_income_statement,
+        "akshare": get_akshare_income_statement,
     },
     # news_data
     "get_news": {
         "alpha_vantage": get_alpha_vantage_news,
         "yfinance": get_news_yfinance,
+        "akshare": get_akshare_news,
     },
     "get_global_news": {
         "yfinance": get_global_news_yfinance,
         "alpha_vantage": get_alpha_vantage_global_news,
+        "akshare": get_akshare_global_news,
     },
     "get_insider_transactions": {
         "alpha_vantage": get_alpha_vantage_insider_transactions,
         "yfinance": get_yfinance_insider_transactions,
+        "akshare": get_akshare_insider_transactions,
     },
 }
 
@@ -131,11 +152,28 @@ def get_vendor(category: str, method: str = None) -> str:
     # Fall back to category-level configuration
     return config.get("data_vendors", {}).get(category, "default")
 
+def _is_a_share(ticker: str) -> bool:
+    """判断是否为 A股 ticker（上交所 .SS 或深交所 .SZ 或北交所 .BJ）。"""
+    if not ticker:
+        return False
+    suffix = ticker.upper().split(".")[-1] if "." in ticker else ""
+    return suffix in ("SS", "SZ", "BJ")
+
+
 def route_to_vendor(method: str, *args, **kwargs):
-    """Route method calls to appropriate vendor implementation with fallback support."""
+    """Route method calls to appropriate vendor implementation with fallback support.
+
+    A股 ticker（.SS/.SZ/.BJ）自动优先使用 akshare，其他 ticker 使用配置的供应商。
+    """
     category = get_category_for_method(method)
     vendor_config = get_vendor(category, method)
     primary_vendors = [v.strip() for v in vendor_config.split(',')]
+
+    # A股自动检测：第一个位置参数通常是 ticker/symbol
+    if args:
+        first_arg = str(args[0])
+        if _is_a_share(first_arg) and "akshare" not in primary_vendors:
+            primary_vendors = ["akshare"] + primary_vendors
 
     if method not in VENDOR_METHODS:
         raise ValueError(f"Method '{method}' not supported")

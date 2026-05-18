@@ -19,6 +19,8 @@ turn 0. The LLM produces the sentiment report in a single invocation.
 See: https://github.com/TauricResearch/TradingAgents/issues/557
 """
 
+import traceback as _traceback
+import sys as _sys
 from datetime import datetime, timedelta
 
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -44,6 +46,14 @@ def create_sentiment_analyst(llm):
     """
 
     def sentiment_analyst_node(state):
+        try:
+            return _sentiment_analyst_node_impl(state)
+        except UnicodeEncodeError as e:
+            with open("unicode_error.log", "w", encoding="utf-8") as f:
+                f.write(_traceback.format_exc())
+            raise
+
+    def _sentiment_analyst_node_impl(state):
         ticker = state["company_of_interest"]
         end_date = state["trade_date"]
         start_date = _seven_days_back(end_date)

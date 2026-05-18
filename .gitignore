@@ -151,6 +151,10 @@ activemq-data/
 .env
 .envrc
 .venv
+reports/
+y/
+*.log
+unicode_error.log
 env/
 venv/
 ENV/

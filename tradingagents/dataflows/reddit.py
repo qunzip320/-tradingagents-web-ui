@@ -49,7 +49,7 @@ def _fetch_subreddit(
     try:
         with urlopen(req, timeout=timeout) as resp:
             payload = json.loads(resp.read())
-    except (HTTPError, URLError, json.JSONDecodeError, TimeoutError) as exc:
+    except (HTTPError, URLError, json.JSONDecodeError, TimeoutError, UnicodeEncodeError) as exc:
         logger.warning("Reddit fetch failed for r/%s · %s: %s", sub, ticker, exc)
         return []
     children = (payload.get("data") or {}).get("children") or []

@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradingAgents · 股票智能分析</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f1117;--surface:#1a1d27;--surface2:#22263a;--border:#2e3250;
+  --accent:#4f8ef7;--green:#22c55e;--red:#ef4444;--yellow:#f59e0b;--gray:#6b7280;
+  --text:#e2e8f0;--text2:#94a3b8;--radius:10px;--font:'Inter',system-ui,sans-serif;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh}
+
+/* ── Header ── */
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px;
+  display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100}
+header .logo{font-size:1.3rem;font-weight:700;color:var(--accent)}
+header .sub{font-size:.85rem;color:var(--text2)}
+
+/* ── Input card ── */
+.input-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:20px;margin:20px;display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+.field{display:flex;flex-direction:column;gap:6px;flex:1;min-width:140px}
+.field label{font-size:.8rem;color:var(--text2);font-weight:500}
+.field input{background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+  padding:10px 14px;color:var(--text);font-size:.95rem;outline:none;transition:.2s}
+.field input:focus{border-color:var(--accent)}
+.btn{padding:10px 28px;border-radius:8px;border:none;font-size:.95rem;font-weight:600;
+  cursor:pointer;transition:.2s;white-space:nowrap}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#3b7de8}
+.btn-primary:disabled{background:var(--gray);cursor:not-allowed}
+.btn-stop{background:#374151;color:var(--text)}
+.btn-stop:hover{background:#4b5563}
+
+/* ── Main grid ── */
+.main{display:grid;grid-template-columns:260px 1fr;gap:16px;padding:0 20px 20px;max-width:1400px;margin:0 auto}
+@media(max-width:768px){.main{grid-template-columns:1fr}}
+
+/* ── Agent panel ── */
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+.panel-title{font-size:.8rem;font-weight:600;color:var(--text2);text-transform:uppercase;
+  letter-spacing:.08em;margin-bottom:14px}
+.agent-list{display:flex;flex-direction:column;gap:6px}
+.agent-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;
+  background:var(--surface2);transition:.3s}
+.agent-item.active{background:#1e2d4a;border:1px solid var(--accent)}
+.agent-item.done{background:#162a1e}
+.dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;transition:.3s}
+.dot.pending{background:var(--gray)}
+.dot.in_progress{background:var(--accent);animation:pulse 1s infinite}
+.dot.completed{background:var(--green)}
+.dot.error{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(1.3)}}
+.agent-name{font-size:.85rem;flex:1}
+.agent-status{font-size:.72rem;color:var(--text2)}
+.team-label{font-size:.72rem;color:var(--text2);padding:10px 0 4px 2px;font-weight:600;
+  text-transform:uppercase;letter-spacing:.06em}
+
+/* ── Right column ── */
+.right-col{display:flex;flex-direction:column;gap:16px}
+
+/* ── Message feed ── */
+.msg-feed{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:16px;height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:6px}
+.msg-feed::-webkit-scrollbar{width:4px}
+.msg-feed::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.msg-item{display:flex;gap:8px;font-size:.8rem;line-height:1.5;animation:fadeIn .3s}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.msg-badge{flex-shrink:0;padding:1px 7px;border-radius:4px;font-size:.7rem;font-weight:600;height:fit-content;margin-top:1px}
+.badge-Agent{background:#1e3a5f;color:#60a5fa}
+.badge-Tool{background:#2d1f4e;color:#a78bfa}
+.badge-Data{background:#1a3a2a;color:#4ade80}
+.badge-System{background:#2a2a1a;color:#fbbf24}
+.msg-content{color:var(--text2);word-break:break-all}
+.feed-empty{color:var(--gray);font-size:.85rem;text-align:center;margin:auto}
+
+/* ── Report tabs ── */
+.report-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+.tab{padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);
+  color:var(--text2);font-size:.8rem;cursor:pointer;transition:.2s;position:relative}
+.tab:hover{border-color:var(--accent);color:var(--text)}
+.tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.tab.has-data::after{content:'';position:absolute;top:4px;right:4px;width:6px;height:6px;
+  border-radius:50%;background:var(--green)}
+.tab-content{display:none}
+.tab-content.active{display:block}
+.report-body{font-size:.88rem;line-height:1.8;color:var(--text2);max-height:500px;overflow-y:auto;padding-right:4px}
+.report-body::-webkit-scrollbar{width:4px}
+.report-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.report-body h1,.report-body h2,.report-body h3{color:var(--text);margin:1em 0 .4em}
+.report-body h1{font-size:1.1rem}.report-body h2{font-size:1rem}.report-body h3{font-size:.92rem}
+.report-body p{margin:.4em 0}
+.report-body ul,.report-body ol{padding-left:1.4em;margin:.4em 0}
+.report-body table{width:100%;border-collapse:collapse;margin:.6em 0;font-size:.82rem}
+.report-body th{background:var(--surface2);padding:6px 10px;text-align:left;border:1px solid var(--border);color:var(--text)}
+.report-body td{padding:6px 10px;border:1px solid var(--border)}
+.report-body code{background:var(--surface2);padding:1px 5px;border-radius:3px;font-size:.85em}
+.report-body blockquote{border-left:3px solid var(--accent);padding-left:12px;color:var(--text2);margin:.4em 0}
+.report-placeholder{color:var(--gray);font-size:.85rem;text-align:center;padding:40px 0}
+
+/* ── Final decision ── */
+.decision-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:20px;text-align:center;display:none}
+.decision-card.show{display:block}
+.decision-label{font-size:.8rem;color:var(--text2);margin-bottom:8px}
+.decision-badge{display:inline-block;padding:10px 40px;border-radius:10px;font-size:2rem;
+  font-weight:800;letter-spacing:.1em;margin-bottom:12px}
+.decision-BUY{background:#14532d;color:#4ade80;border:2px solid #22c55e}
+.decision-HOLD{background:#1c1917;color:#d1d5db;border:2px solid #6b7280}
+.decision-SELL{background:#450a0a;color:#fca5a5;border:2px solid #ef4444}
+.decision-elapsed{font-size:.8rem;color:var(--text2)}
+
+/* ── Status bar ── */
+.status-bar{background:var(--surface2);border-radius:6px;padding:8px 14px;font-size:.8rem;
+  color:var(--text2);margin:0 20px 8px;display:flex;align-items:center;gap:8px}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--gray);flex-shrink:0}
+.status-dot.running{background:var(--accent);animation:pulse 1s infinite}
+.status-dot.done{background:var(--green)}
+.status-dot.error{background:var(--red)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">📈 TradingAgents</div>
+  <div class="sub">多智能体股票分析系统</div>
+</header>
+
+<div class="input-card">
+  <div class="field">
+    <label>股票代码</label>
+    <input id="ticker" type="text" placeholder="如 600519.SS / AAPL / 0700.HK" value="">
+  </div>
+  <div class="field" style="max-width:180px">
+    <label>分析日期</label>
+    <input id="date" type="date" value="">
+  </div>
+  <button class="btn btn-primary" id="startBtn" onclick="startAnalysis()">开始分析</button>
+  <button class="btn btn-stop" id="stopBtn" onclick="stopAnalysis()" style="display:none">停止</button>
+</div>
+
+<div class="status-bar" id="statusBar" style="display:none">
+  <div class="status-dot" id="statusDot"></div>
+  <span id="statusText">准备中...</span>
+</div>
+
+<div class="main">
+  <!-- 左：智能体进度 -->
+  <div>
+    <div class="panel">
+      <div class="panel-title">智能体进度</div>
+      <div class="agent-list" id="agentList">
+        <div class="team-label">分析师团队</div>
+        <div class="agent-item" id="agent-Market Analyst">
+          <div class="dot pending" id="dot-Market Analyst"></div>
+          <span class="agent-name">市场分析师</span>
+          <span class="agent-status" id="status-Market Analyst">等待中</span>
+        </div>
+        <div class="agent-item" id="agent-Sentiment Analyst">
+          <div class="dot pending" id="dot-Sentiment Analyst"></div>
+          <span class="agent-name">情感分析师</span>
+          <span class="agent-status" id="status-Sentiment Analyst">等待中</span>
+        </div>
+        <div class="agent-item" id="agent-News Analyst">
+          <div class="dot pending" id="dot-News Analyst"></div>
+          <span class="agent-name">新闻分析师</span>
+          <span class="agent-status" id="status-News Analyst">等待中</span>
+        </div>
+        <div class="agent-item" id="agent-Fundamentals Analyst">
+          <div class="dot pending" id="dot-Fundamentals Analyst"></div>
+          <span class="agent-name">基本面分析师</span>
+          <span class="agent-status" id="status-Fundamentals Analyst">等待中</span>
+        </div>
+        <div class="team-label">研究团队</div>
+        <div class="agent-item" id="agent-Bull Researcher">
+          <div class="dot pending" id="dot-Bull Researcher"></div>
+          <span class="agent-name">多头研究员</span>
+          <span class="agent-status" id="status-Bull Researcher">等待中</span>
+        </div>
+        <div class="agent-item" id="agent-Bear Researcher">
+          <div class="dot pending" id="dot-Bear Researcher"></div>
+          <span class="agent-name">空头研究员</span>
+          <span class="agent-status" id="status-Bear Researcher">等待中</span>
+        </div>
+        <div class="agent-item" id="agent-Research Manager">
+          <div class="dot pending" id="dot-Research Manager"></div>
+          <span class="agent-name">研究经理</span>
+          <span class="agent-status" id="status-Research Manager">等待中</span>
+        </div>
+        <div class="team-label">交易 & 风控</div>
+        <div class="agent-item" id="agent-Trader">
+          <div class="dot pending" id="dot-Trader"></div>
+          <span class="agent-name">交易员</span>
+          <span class="agent-status" id="status-Trader">等待中</span>
+        </div>
+        <div class="agent-item" id="agent-Aggressive Analyst">
+          <div class="dot pending" id="dot-Aggressive Analyst"></div>
+          <span class="agent-name">激进分析师</span>
+          <span class="agent-status" id="status-Aggressive Analyst">等待中</span>
+        </div>
+        <div class="agent-item" id="agent-Conservative Analyst">
+          <div class="dot pending" id="dot-Conservative Analyst"></div>
+          <span class="agent-name">保守分析师</span>
+          <span class="agent-status" id="status-Conservative Analyst">等待中</span>
+        </div>
+        <div class="agent-item" id="agent-Neutral Analyst">
+          <div class="dot pending" id="dot-Neutral Analyst"></div>
+          <span class="agent-name">中性分析师</span>
+          <span class="agent-status" id="status-Neutral Analyst">等待中</span>
+        </div>
+        <div class="agent-item" id="agent-Portfolio Manager">
+          <div class="dot pending" id="dot-Portfolio Manager"></div>
+          <span class="agent-name">投资组合经理</span>
+          <span class="agent-status" id="status-Portfolio Manager">等待中</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 右：消息流 + 报告 -->
+  <div class="right-col">
+    <!-- 消息流 -->
+    <div class="panel">
+      <div class="panel-title">实时消息流</div>
+      <div class="msg-feed" id="msgFeed">
+        <div class="feed-empty" id="feedEmpty">等待分析开始...</div>
+      </div>
+    </div>
+
+    <!-- 最终决策 -->
+    <div class="decision-card" id="decisionCard">
+      <div class="decision-label">最终投资决策</div>
+      <div class="decision-badge" id="decisionBadge">-</div>
+      <div class="decision-elapsed" id="decisionElapsed"></div>
+    </div>
+
+    <!-- 报告 Tabs -->
+    <div class="report-card">
+      <div class="panel-title">分析报告</div>
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab('market_report')" id="tab-market_report">市场分析</div>
+        <div class="tab" onclick="switchTab('sentiment_report')" id="tab-sentiment_report">情感分析</div>
+        <div class="tab" onclick="switchTab('news_report')" id="tab-news_report">新闻分析</div>
+        <div class="tab" onclick="switchTab('fundamentals_report')" id="tab-fundamentals_report">基本面</div>
+        <div class="tab" onclick="switchTab('investment_plan')" id="tab-investment_plan">研究决策</div>
+        <div class="tab" onclick="switchTab('trader_investment_plan')" id="tab-trader_investment_plan">交易计划</div>
+        <div class="tab" onclick="switchTab('final_trade_decision')" id="tab-final_trade_decision">最终决策</div>
+      </div>
+      <div id="tab-content-market_report" class="tab-content active">
+        <div class="report-body" id="report-market_report"><div class="report-placeholder">等待市场分析报告...</div></div>
+      </div>
+      <div id="tab-content-sentiment_report" class="tab-content">
+        <div class="report-body" id="report-sentiment_report"><div class="report-placeholder">等待情感分析报告...</div></div>
+      </div>
+      <div id="tab-content-news_report" class="tab-content">
+        <div class="report-body" id="report-news_report"><div class="report-placeholder">等待新闻分析报告...</div></div>
+      </div>
+      <div id="tab-content-fundamentals_report" class="tab-content">
+        <div class="report-body" id="report-fundamentals_report"><div class="report-placeholder">等待基本面分析报告...</div></div>
+      </div>
+      <div id="tab-content-investment_plan" class="tab-content">
+        <div class="report-body" id="report-investment_plan"><div class="report-placeholder">等待研究团队决策...</div></div>
+      </div>
+      <div id="tab-content-trader_investment_plan" class="tab-content">
+        <div class="report-body" id="report-trader_investment_plan"><div class="report-placeholder">等待交易计划...</div></div>
+      </div>
+      <div id="tab-content-final_trade_decision" class="tab-content">
+        <div class="report-body" id="report-final_trade_decision"><div class="report-placeholder">等待最终决策...</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// 初始化日期
+document.getElementById('date').value = new Date().toISOString().slice(0,10);
+
+let evtSource = null;
+let activeTab = 'market_report';
+
+const STATUS_TEXT = {pending:'等待中', in_progress:'分析中...', completed:'已完成', error:'出错'};
+const AGENT_CN = {
+  'Market Analyst':'市场分析师','Sentiment Analyst':'情感分析师',
+  'News Analyst':'新闻分析师','Fundamentals Analyst':'基本面分析师',
+  'Bull Researcher':'多头研究员','Bear Researcher':'空头研究员',
+  'Research Manager':'研究经理','Trader':'交易员',
+  'Aggressive Analyst':'激进分析师','Conservative Analyst':'保守分析师',
+  'Neutral Analyst':'中性分析师','Portfolio Manager':'投资组合经理',
+};
+
+function setStatus(state, text) {
+  const bar = document.getElementById('statusBar');
+  const dot = document.getElementById('statusDot');
+  const txt = document.getElementById('statusText');
+  bar.style.display = 'flex';
+  dot.className = 'status-dot ' + state;
+  txt.textContent = text;
+}
+
+function updateAgent(agent, status) {
+  const item = document.getElementById('agent-' + agent);
+  const dot = document.getElementById('dot-' + agent);
+  const st = document.getElementById('status-' + agent);
+  if (!item) return;
+  item.className = 'agent-item' + (status === 'in_progress' ? ' active' : status === 'completed' ? ' done' : '');
+  dot.className = 'dot ' + status;
+  st.textContent = STATUS_TEXT[status] || status;
+}
+
+function addMessage(type, content) {
+  const feed = document.getElementById('msgFeed');
+  const empty = document.getElementById('feedEmpty');
+  if (empty) empty.remove();
+  const item = document.createElement('div');
+  item.className = 'msg-item';
+  item.innerHTML = `<span class="msg-badge badge-${type}">${type}</span><span class="msg-content">${escHtml(content)}</span>`;
+  feed.insertBefore(item, feed.firstChild);
+  // 最多保留 80 条
+  while (feed.children.length > 80) feed.removeChild(feed.lastChild);
+}
+
+function updateReport(section, content) {
+  const el = document.getElementById('report-' + section);
+  if (!el) return;
+  el.innerHTML = marked.parse(content);
+  const tab = document.getElementById('tab-' + section);
+  if (tab) tab.classList.add('has-data');
+  // 自动切换到最新完成的报告
+  switchTab(section);
+}
+
+function switchTab(section) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  const tab = document.getElementById('tab-' + section);
+  const content = document.getElementById('tab-content-' + section);
+  if (tab) tab.classList.add('active');
+  if (content) content.classList.add('active');
+  activeTab = section;
+}
+
+function showDecision(decision, elapsed) {
+  const card = document.getElementById('decisionCard');
+  const badge = document.getElementById('decisionBadge');
+  const el = document.getElementById('decisionElapsed');
+  card.classList.add('show');
+  badge.className = 'decision-badge decision-' + decision;
+  const labels = {BUY:'买入 BUY', HOLD:'持有 HOLD', SELL:'卖出 SELL'};
+  badge.textContent = labels[decision] || decision;
+  el.textContent = `分析耗时 ${elapsed} 秒`;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function resetUI() {
+  // 重置所有 agent 状态
+  Object.keys(AGENT_CN).forEach(a => updateAgent(a, 'pending'));
+  // 清空消息流
+  const feed = document.getElementById('msgFeed');
+  feed.innerHTML = '<div class="feed-empty" id="feedEmpty">等待分析开始...</div>';
+  // 清空报告
+  const sections = ['market_report','sentiment_report','news_report','fundamentals_report',
+                    'investment_plan','trader_investment_plan','final_trade_decision'];
+  const placeholders = {
+    market_report:'等待市场分析报告...',sentiment_report:'等待情感分析报告...',
+    news_report:'等待新闻分析报告...',fundamentals_report:'等待基本面分析报告...',
+    investment_plan:'等待研究团队决策...',trader_investment_plan:'等待交易计划...',
+    final_trade_decision:'等待最终决策...'
+  };
+  sections.forEach(s => {
+    const el = document.getElementById('report-' + s);
+    if (el) el.innerHTML = `<div class="report-placeholder">${placeholders[s]}</div>`;
+    const tab = document.getElementById('tab-' + s);
+    if (tab) tab.classList.remove('has-data');
+  });
+  switchTab('market_report');
+  // 隐藏决策卡
+  document.getElementById('decisionCard').classList.remove('show');
+}
+
+function startAnalysis() {
+  const ticker = document.getElementById('ticker').value.trim().toUpperCase();
+  const date = document.getElementById('date').value;
+  if (!ticker) { alert('请输入股票代码'); return; }
+  if (!date) { alert('请选择分析日期'); return; }
+
+  if (evtSource) { evtSource.close(); evtSource = null; }
+  resetUI();
+
+  document.getElementById('startBtn').disabled = true;
+  document.getElementById('stopBtn').style.display = 'inline-block';
+  setStatus('running', `正在分析 ${ticker} (${date})...`);
+
+  const url = `/analyze?ticker=${encodeURIComponent(ticker)}&date=${encodeURIComponent(date)}`;
+  evtSource = new EventSource(url);
+
+  evtSource.onmessage = (e) => {
+    let data;
+    try { data = JSON.parse(e.data); } catch { return; }
+
+    switch (data.type) {
+      case 'agent_status':
+        updateAgent(data.agent, data.status);
+        break;
+      case 'message':
+        if (data.content) addMessage(data.msg_type, data.content);
+        break;
+      case 'report':
+        updateReport(data.section, data.content);
+        break;
+      case 'debate':
+        // 辩论内容追加到对应报告
+        updateReport('investment_plan', data.content);
+        break;
+      case 'final':
+        showDecision(data.decision, 0);
+        updateReport('final_trade_decision', data.content);
+        break;
+      case 'done':
+        showDecision(
+          document.getElementById('decisionBadge').textContent.includes('买') ? 'BUY' :
+          document.getElementById('decisionBadge').textContent.includes('卖') ? 'SELL' : 'HOLD',
+          data.elapsed
+        );
+        document.getElementById('decisionElapsed').textContent = `分析耗时 ${data.elapsed} 秒`;
+        setStatus('done', `分析完成，耗时 ${data.elapsed} 秒`);
+        finishAnalysis();
+        break;
+      case 'error':
+        setStatus('error', '错误: ' + data.message);
+        addMessage('System', '❌ ' + data.message);
+        finishAnalysis();
+        break;
+    }
+  };
+
+  evtSource.onerror = () => {
+    setStatus('error', '连接中断');
+    finishAnalysis();
+  };
+}
+
+function stopAnalysis() {
+  if (evtSource) { evtSource.close(); evtSource = null; }
+  setStatus('', '已停止');
+  finishAnalysis();
+}
+
+function finishAnalysis() {
+  if (evtSource) { evtSource.close(); evtSource = null; }
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('stopBtn').style.display = 'none';
+}
+</script>
+</body>
+</html>

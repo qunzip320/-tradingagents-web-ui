@@ -1,1 +1,9 @@
+# 安装本地包（tradingagents + cli）
 .
+
+# Web 服务额外依赖
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+sse-starlette>=1.6.5
+python-dotenv>=1.0.0
+akshare>=1.10.0
