@@ -26,6 +26,7 @@ USER appuser
 WORKDIR /home/appuser/app
 
 COPY --from=builder --chown=appuser:appuser /build .
+RUN chmod +x start.sh
 
 EXPOSE 8000
-CMD ["bash", "start.sh"]
+CMD ["bash", "./start.sh"]
