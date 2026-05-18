@@ -18,7 +18,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px;
   display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100}
 header .logo{font-size:1.3rem;font-weight:700;color:var(--accent)}
-header .sub{font-size:.85rem;color:var(--text2)}
+header .sub{font-size:.85rem;color:var(--text2);flex:1}
+header .nav-tab{padding:6px 16px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);
+  color:var(--text2);font-size:.8rem;cursor:pointer;transition:.2s}
+header .nav-tab:hover{border-color:var(--accent);color:var(--text)}
+header .nav-tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
 
 /* ── Input card ── */
 .input-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
@@ -35,15 +39,21 @@ header .sub{font-size:.85rem;color:var(--text2)}
 .btn-primary:disabled{background:var(--gray);cursor:not-allowed}
 .btn-stop{background:#374151;color:var(--text)}
 .btn-stop:hover{background:#4b5563}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text2);padding:6px 14px;font-size:.8rem}
+.btn-ghost:hover{border-color:var(--accent);color:var(--text)}
 
 /* ── Main grid ── */
-.main{display:grid;grid-template-columns:260px 1fr;gap:16px;padding:0 20px 20px;max-width:1400px;margin:0 auto}
+.main{display:grid;grid-template-columns:280px 1fr;gap:16px;padding:0 20px 20px;max-width:1500px;margin:0 auto}
 @media(max-width:768px){.main{grid-template-columns:1fr}}
+
+/* ── Left sidebar panels ── */
+.sidebar{display:flex;flex-direction:column;gap:12px}
 
 /* ── Agent panel ── */
 .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
 .panel-title{font-size:.8rem;font-weight:600;color:var(--text2);text-transform:uppercase;
-  letter-spacing:.08em;margin-bottom:14px}
+  letter-spacing:.08em;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.panel-title .count{font-size:.72rem;color:var(--gray);font-weight:400}
 .agent-list{display:flex;flex-direction:column;gap:6px}
 .agent-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;
   background:var(--surface2);transition:.3s}
@@ -60,12 +70,33 @@ header .sub{font-size:.85rem;color:var(--text2)}
 .team-label{font-size:.72rem;color:var(--text2);padding:10px 0 4px 2px;font-weight:600;
   text-transform:uppercase;letter-spacing:.06em}
 
+/* ── History panel ── */
+.history-list{display:flex;flex-direction:column;gap:4px;max-height:360px;overflow-y:auto}
+.history-list::-webkit-scrollbar{width:4px}
+.history-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.history-item{padding:10px 12px;border-radius:8px;background:var(--surface2);cursor:pointer;
+  transition:.2s;display:flex;align-items:center;gap:10px}
+.history-item:hover{background:#1e2d4a}
+.history-item.active{background:#1e2d4a;border:1px solid var(--accent)}
+.history-item .hi-ticker{font-size:.9rem;font-weight:600;flex:1}
+.history-item .hi-date{font-size:.72rem;color:var(--text2)}
+.history-item .hi-badge{padding:2px 8px;border-radius:4px;font-size:.65rem;font-weight:700;flex-shrink:0}
+.hi-badge.BUY{background:#14532d;color:#4ade80}
+.hi-badge.HOLD{background:#1c1917;color:#d1d5db}
+.hi-badge.SELL{background:#450a0a;color:#fca5a5}
+.hi-badge.none{background:transparent;color:var(--gray)}
+.history-empty{color:var(--gray);font-size:.8rem;text-align:center;padding:16px 0}
+
 /* ── Right column ── */
 .right-col{display:flex;flex-direction:column;gap:16px}
 
+/* ── Current view label ── */
+.view-label{font-size:.78rem;color:var(--accent);padding:4px 0;display:flex;align-items:center;gap:6px}
+.view-label .vl-icon{font-size:1rem}
+
 /* ── Message feed ── */
 .msg-feed{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
-  padding:16px;height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:6px}
+  padding:16px;height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:6px}
 .msg-feed::-webkit-scrollbar{width:4px}
 .msg-feed::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
 .msg-item{display:flex;gap:8px;font-size:.8rem;line-height:1.5;animation:fadeIn .3s}
@@ -129,9 +160,11 @@ header .sub{font-size:.85rem;color:var(--text2)}
 <header>
   <div class="logo">📈 TradingAgents</div>
   <div class="sub">多智能体股票分析系统</div>
+  <button class="nav-tab active" id="navLive" onclick="setView('live')">实时分析</button>
+  <button class="nav-tab" id="navHistory" onclick="setView('history')">历史报告</button>
 </header>
 
-<div class="input-card">
+<div class="input-card" id="inputCard">
   <div class="field">
     <label>股票代码</label>
     <input id="ticker" type="text" placeholder="如 600519.SS / AAPL / 0700.HK" value="">
@@ -150,9 +183,10 @@ header .sub{font-size:.85rem;color:var(--text2)}
 </div>
 
 <div class="main">
-  <!-- 左：智能体进度 -->
-  <div>
-    <div class="panel">
+  <!-- 左：智能体进度 + 历史 -->
+  <div class="sidebar">
+    <!-- 实时：智能体进度 -->
+    <div class="panel" id="agentPanel">
       <div class="panel-title">智能体进度</div>
       <div class="agent-list" id="agentList">
         <div class="team-label">分析师团队</div>
@@ -220,12 +254,27 @@ header .sub{font-size:.85rem;color:var(--text2)}
         </div>
       </div>
     </div>
+
+    <!-- 历史：报告列表 -->
+    <div class="panel" id="historyPanel" style="display:none">
+      <div class="panel-title">历史报告 <span class="count" id="historyCount"></span></div>
+      <div class="history-list" id="historyList">
+        <div class="history-empty">加载中...</div>
+      </div>
+    </div>
   </div>
 
   <!-- 右：消息流 + 报告 -->
   <div class="right-col">
-    <!-- 消息流 -->
-    <div class="panel">
+    <!-- 视图标签 -->
+    <div class="view-label" id="viewLabel" style="display:none">
+      <span class="vl-icon">📋</span>
+      <span id="viewLabelText"></span>
+      <button class="btn-ghost" onclick="setView('live')" style="margin-left:auto">← 返回实时</button>
+    </div>
+
+    <!-- 消息流（实时模式） -->
+    <div class="panel" id="msgPanel">
       <div class="panel-title">实时消息流</div>
       <div class="msg-feed" id="msgFeed">
         <div class="feed-empty" id="feedEmpty">等待分析开始...</div>
@@ -277,11 +326,15 @@ header .sub{font-size:.85rem;color:var(--text2)}
 </div>
 
 <script>
-// 初始化日期
+// ═══════════════════════════════════════════════════════
+// 初始化
+// ═══════════════════════════════════════════════════════
 document.getElementById('date').value = new Date().toISOString().slice(0,10);
 
 let evtSource = null;
 let activeTab = 'market_report';
+let currentView = 'live';        // 'live' | 'history'
+let currentHistoryId = null;
 
 const STATUS_TEXT = {pending:'等待中', in_progress:'分析中...', completed:'已完成', error:'出错'};
 const AGENT_CN = {
@@ -292,7 +345,165 @@ const AGENT_CN = {
   'Aggressive Analyst':'激进分析师','Conservative Analyst':'保守分析师',
   'Neutral Analyst':'中性分析师','Portfolio Manager':'投资组合经理',
 };
+const DECISION_LABELS = {BUY:'买入 BUY', HOLD:'持有 HOLD', SELL:'卖出 SELL'};
 
+const PLACEHOLDERS = {
+  market_report:'等待市场分析报告...',sentiment_report:'等待情感分析报告...',
+  news_report:'等待新闻分析报告...',fundamentals_report:'等待基本面分析报告...',
+  investment_plan:'等待研究团队决策...',trader_investment_plan:'等待交易计划...',
+  final_trade_decision:'等待最终决策...'
+};
+
+// ═══════════════════════════════════════════════════════
+// 视图切换
+// ═══════════════════════════════════════════════════════
+function setView(view) {
+  currentView = view;
+  document.getElementById('navLive').classList.toggle('active', view === 'live');
+  document.getElementById('navHistory').classList.toggle('active', view === 'history');
+
+  // 左侧面板
+  document.getElementById('agentPanel').style.display = view === 'live' ? '' : 'none';
+  document.getElementById('historyPanel').style.display = view === 'history' ? '' : 'none';
+
+  // 输入栏
+  document.getElementById('inputCard').style.display = view === 'live' ? '' : 'none';
+
+  // 消息流
+  document.getElementById('msgPanel').style.display = view === 'live' ? '' : 'none';
+
+  // 状态栏
+  if (view === 'history') {
+    document.getElementById('statusBar').style.display = 'none';
+  }
+
+  // 视图标签
+  if (view === 'history' && currentHistoryId) {
+    updateViewLabel(currentHistoryId);
+  } else {
+    document.getElementById('viewLabel').style.display = 'none';
+  }
+
+  // 决策卡：历史模式显示，实时模式有结果才显示
+  if (view === 'history' && currentHistoryId) {
+    document.getElementById('decisionCard').classList.add('show');
+  } else if (view === 'live') {
+    // keep current state
+  }
+
+  if (view === 'history') {
+    loadHistoryList();
+  }
+}
+
+function updateViewLabel(reportId) {
+  const label = document.getElementById('viewLabel');
+  const text = document.getElementById('viewLabelText');
+  label.style.display = 'flex';
+  // 解析报告ID: ticker_timestamp
+  const idx = reportId.indexOf('_');
+  const ticker = idx > 0 ? reportId.slice(0, idx) : reportId;
+  const ts = idx > 0 ? reportId.slice(idx + 1) : '';
+  let dateStr = ts;
+  if (/^\d{8}_\d{6}$/.test(ts)) {
+    dateStr = ts.slice(0,4)+'-'+ts.slice(4,6)+'-'+ts.slice(6,8)+' '+ts.slice(9,11)+':'+ts.slice(11,13)+':'+ts.slice(13,15);
+  }
+  text.textContent = `查看历史报告：${ticker} (${dateStr})`;
+}
+
+// ═══════════════════════════════════════════════════════
+// 历史报告
+// ═══════════════════════════════════════════════════════
+async function loadHistoryList() {
+  const list = document.getElementById('historyList');
+  const count = document.getElementById('historyCount');
+
+  try {
+    const resp = await fetch('/api/reports');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const reports = await resp.json();
+
+    count.textContent = `(${reports.length} 份)`;
+
+    if (reports.length === 0) {
+      list.innerHTML = '<div class="history-empty">暂无历史报告</div>';
+      return;
+    }
+
+    list.innerHTML = reports.map(r => {
+      const badge = r.decision ? `<span class="hi-badge ${r.decision}">${DECISION_LABELS[r.decision]?r.decision:'?'}</span>` : '<span class="hi-badge none">-</span>';
+      return `
+        <div class="history-item${r.id === currentHistoryId ? ' active' : ''}" onclick="loadHistoryReport('${r.id}')">
+          <span class="hi-ticker">${escHtml(r.ticker)}</span>
+          <span class="hi-date">${r.date}</span>
+          ${badge}
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    list.innerHTML = '<div class="history-empty">加载失败: ' + escHtml(err.message) + '</div>';
+  }
+}
+
+async function loadHistoryReport(reportId) {
+  currentHistoryId = reportId;
+
+  // 高亮当前项
+  document.querySelectorAll('.history-item').forEach(el => {
+    el.classList.toggle('active', el.querySelector('.hi-ticker')?.textContent === reportId.split('_')[0]
+      && el.querySelector('.hi-date')?.textContent.includes(reportId.slice(-15,-9)));
+  });
+
+  try {
+    const resp = await fetch('/api/report/' + encodeURIComponent(reportId));
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    const content = data.content;
+
+    // 渲染完整报告到 market_report tab
+    updateReport('market_report', content);
+    // 切换到市场分析 tab
+    switchTab('market_report');
+
+    // 提取最终决策
+    const mBuy = content.match(/最终决策[：:]\s*(买入)/);
+    const mSell = content.match(/最终决策[：:]\s*(卖出)/);
+    const mHold = content.match(/最终决策[：:]\s*(持有)/);
+    if (mBuy) showDecision('BUY', '');
+    else if (mSell) showDecision('SELL', '');
+    else if (mHold) showDecision('HOLD', '');
+    document.getElementById('decisionCard').classList.add('show');
+
+    // 加载子章节
+    await loadReportSections(reportId);
+
+    updateViewLabel(reportId);
+
+    // 切换到历史视图
+    if (currentView !== 'history') setView('history');
+
+  } catch (err) {
+    alert('加载报告失败: ' + err.message);
+  }
+}
+
+async function loadReportSections(reportId) {
+  const sections = ['sentiment', 'news', 'fundamentals'];
+  for (const sec of sections) {
+    try {
+      const resp = await fetch(`/api/report/${encodeURIComponent(reportId)}/section/${sec}`);
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      updateReport(sec + '_report', data.content);
+    } catch (e) {
+      // 静默跳过缺失的章节
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// UI 工具函数
+// ═══════════════════════════════════════════════════════
 function setStatus(state, text) {
   const bar = document.getElementById('statusBar');
   const dot = document.getElementById('statusDot');
@@ -320,7 +531,6 @@ function addMessage(type, content) {
   item.className = 'msg-item';
   item.innerHTML = `<span class="msg-badge badge-${type}">${type}</span><span class="msg-content">${escHtml(content)}</span>`;
   feed.insertBefore(item, feed.firstChild);
-  // 最多保留 80 条
   while (feed.children.length > 80) feed.removeChild(feed.lastChild);
 }
 
@@ -330,8 +540,6 @@ function updateReport(section, content) {
   el.innerHTML = marked.parse(content);
   const tab = document.getElementById('tab-' + section);
   if (tab) tab.classList.add('has-data');
-  // 自动切换到最新完成的报告
-  switchTab(section);
 }
 
 function switchTab(section) {
@@ -350,9 +558,8 @@ function showDecision(decision, elapsed) {
   const el = document.getElementById('decisionElapsed');
   card.classList.add('show');
   badge.className = 'decision-badge decision-' + decision;
-  const labels = {BUY:'买入 BUY', HOLD:'持有 HOLD', SELL:'卖出 SELL'};
-  badge.textContent = labels[decision] || decision;
-  el.textContent = `分析耗时 ${elapsed} 秒`;
+  badge.textContent = DECISION_LABELS[decision] || decision;
+  if (elapsed) el.textContent = `分析耗时 ${elapsed} 秒`;
 }
 
 function escHtml(s) {
@@ -360,31 +567,26 @@ function escHtml(s) {
 }
 
 function resetUI() {
-  // 重置所有 agent 状态
   Object.keys(AGENT_CN).forEach(a => updateAgent(a, 'pending'));
-  // 清空消息流
   const feed = document.getElementById('msgFeed');
   feed.innerHTML = '<div class="feed-empty" id="feedEmpty">等待分析开始...</div>';
-  // 清空报告
   const sections = ['market_report','sentiment_report','news_report','fundamentals_report',
                     'investment_plan','trader_investment_plan','final_trade_decision'];
-  const placeholders = {
-    market_report:'等待市场分析报告...',sentiment_report:'等待情感分析报告...',
-    news_report:'等待新闻分析报告...',fundamentals_report:'等待基本面分析报告...',
-    investment_plan:'等待研究团队决策...',trader_investment_plan:'等待交易计划...',
-    final_trade_decision:'等待最终决策...'
-  };
   sections.forEach(s => {
     const el = document.getElementById('report-' + s);
-    if (el) el.innerHTML = `<div class="report-placeholder">${placeholders[s]}</div>`;
+    if (el) el.innerHTML = `<div class="report-placeholder">${PLACEHOLDERS[s]}</div>`;
     const tab = document.getElementById('tab-' + s);
     if (tab) tab.classList.remove('has-data');
   });
   switchTab('market_report');
-  // 隐藏决策卡
   document.getElementById('decisionCard').classList.remove('show');
+  document.getElementById('viewLabel').style.display = 'none';
+  currentHistoryId = null;
 }
 
+// ═══════════════════════════════════════════════════════
+// 实时分析
+// ═══════════════════════════════════════════════════════
 function startAnalysis() {
   const ticker = document.getElementById('ticker').value.trim().toUpperCase();
   const date = document.getElementById('date').value;
@@ -393,6 +595,7 @@ function startAnalysis() {
 
   if (evtSource) { evtSource.close(); evtSource = null; }
   resetUI();
+  setView('live');
 
   document.getElementById('startBtn').disabled = true;
   document.getElementById('stopBtn').style.display = 'inline-block';
@@ -416,7 +619,6 @@ function startAnalysis() {
         updateReport(data.section, data.content);
         break;
       case 'debate':
-        // 辩论内容追加到对应报告
         updateReport('investment_plan', data.content);
         break;
       case 'final':

@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import re
 import sys
 import time
 from datetime import datetime
@@ -9,7 +10,7 @@ from typing import AsyncGenerator
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from sse_starlette.sse import EventSourceResponse
 
 load_dotenv(Path(__file__).parent.parent / ".env")
@@ -23,6 +24,7 @@ from tradingagents.graph.analyst_execution import build_analyst_execution_plan
 app = FastAPI(title="TradingAgents Web")
 
 STATIC_DIR = Path(__file__).parent / "static"
+REPORTS_DIR = Path(__file__).parent.parent / "reports"
 
 ANALYST_ORDER = ["market", "social", "news", "fundamentals"]
 ANALYST_AGENT_NAMES = {
@@ -249,3 +251,133 @@ async def analyze(
             yield {"data": event}
 
     return EventSourceResponse(generator())
+
+
+# ═══════════════════════════════════════════════════════
+# 历史报告 API
+# ═══════════════════════════════════════════════════════
+
+SECTION_NAMES: dict[str, str] = {
+    "market_report": "市场分析",
+    "sentiment_report": "情感分析",
+    "news_report": "新闻分析",
+    "fundamentals_report": "基本面分析",
+    "investment_plan": "研究决策",
+    "trader_investment_plan": "交易计划",
+    "final_trade_decision": "最终决策",
+}
+
+SECTION_FILES: dict[str, str] = {
+    "market": "1_analysts/market.md",
+    "sentiment": "1_analysts/sentiment.md",
+    "news": "1_analysts/news.md",
+    "fundamentals": "1_analysts/fundamentals.md",
+}
+
+
+def _parse_report_id(report_id: str) -> tuple[str, str]:
+    """Extract ticker and timestamp from report dir name like '小米集团_20260518_100034'."""
+    m = re.match(r"^(.+)_(\d{8}_\d{6})$", report_id)
+    if not m:
+        raise ValueError(f"无效的报告 ID: {report_id}")
+    ticker = m.group(1)
+    ts = m.group(2)
+    try:
+        dt = datetime.strptime(ts, "%Y%m%d_%H%M%S")
+        return ticker, dt.strftime("%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return ticker, ts
+
+
+@app.get("/api/reports")
+async def list_reports():
+    """列出所有历史分析报告"""
+    results = []
+    if not REPORTS_DIR.exists():
+        return JSONResponse(results)
+
+    for d in sorted(REPORTS_DIR.iterdir(), reverse=True):
+        if not d.is_dir():
+            continue
+        complete = d / "complete_report.md"
+        if not complete.exists():
+            continue
+        try:
+            ticker, date_str = _parse_report_id(d.name)
+        except ValueError:
+            continue
+
+        # 提取决策（买入/持有/卖出）
+        decision = ""
+        text = complete.read_text(encoding="utf-8")
+        tail = text[len(text)//2:]
+
+        # 1) 显式评级标签: 评级：Underweight / 评级：买入
+        m = re.search(r"评级[：:]\s*(Buy|Sell|Hold|Underweight|Overweight|买入|卖出|持有|减仓)", tail, re.IGNORECASE)
+        if not m:
+            # 2) 维持"买入"评级
+            m = re.search(r'维持["\u300c]?\s*([买卖持][入有出])\s*["\u300d]?(?:评级)?', tail)
+        if not m:
+            # 3) 最终决策/方向性: 买入
+            m = re.search(r"(?:最终(?:决策|评级|提案)|方向性|结论)[：:]\s*.*?([买卖持][入有出])", tail)
+        if not m:
+            # 4) 决定为/决定: 买入
+            m = re.search(r"决定[了为]?[：:]*\s*([买卖持][入有出])", tail)
+        if not m:
+            # 5) 最终提案中包含减仓/建仓等方向词
+            m_final = re.search(r"最终提案[：:]\s*(.+)", tail)
+            if m_final:
+                proposal = m_final.group(1)
+                if re.search(r"减仓|减持|卖出|清仓|Underweight", proposal):
+                    decision = "SELL"
+                elif re.search(r"加仓|增持|建仓|买入|Buy|Overweight", proposal):
+                    decision = "BUY"
+                elif re.search(r"持有|Hold", proposal):
+                    decision = "HOLD"
+
+        if m and not decision:
+            word = m.group(1).upper()
+            decision = {
+                "买入": "BUY", "卖出": "SELL", "持有": "HOLD",
+                "BUY": "BUY", "SELL": "SELL", "HOLD": "HOLD",
+                "OVERWEIGHT": "BUY", "UNDERWEIGHT": "SELL",
+            }.get(word, word)
+
+        results.append({
+            "id": d.name,
+            "ticker": ticker,
+            "date": date_str,
+            "decision": decision,
+            "size": len(text),
+        })
+
+    return JSONResponse(results)
+
+
+@app.get("/api/report/{report_id}")
+async def get_report(report_id: str):
+    """获取完整报告"""
+    report_path = REPORTS_DIR / report_id / "complete_report.md"
+    if not report_path.exists():
+        return JSONResponse({"error": "报告不存在"}, status_code=404)
+    return JSONResponse({
+        "id": report_id,
+        "content": report_path.read_text(encoding="utf-8"),
+    })
+
+
+@app.get("/api/report/{report_id}/section/{section}")
+async def get_report_section(report_id: str, section: str):
+    """获取报告中的某个子章节"""
+    if section not in SECTION_FILES:
+        return JSONResponse({"error": "无效的章节"}, status_code=400)
+
+    file_path = REPORTS_DIR / report_id / SECTION_FILES[section]
+    if not file_path.exists():
+        return JSONResponse({"error": "章节不存在"}, status_code=404)
+
+    return JSONResponse({
+        "id": report_id,
+        "section": section,
+        "content": file_path.read_text(encoding="utf-8"),
+    })
