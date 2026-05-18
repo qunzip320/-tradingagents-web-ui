@@ -8,8 +8,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 WORKDIR /build
 COPY . .
-RUN pip install --no-cache-dir "uvicorn[standard]>=0.29.0" "fastapi>=0.110.0" "sse-starlette>=1.6.5" "python-dotenv>=1.0.0"
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir -r requirements.txt
 
 FROM python:3.12-slim
 
