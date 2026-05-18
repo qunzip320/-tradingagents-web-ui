@@ -166,6 +166,8 @@ def get_fundamentals(
 
 def get_balance_sheet(
     ticker: Annotated[str, "股票代码"],
+    freq: str = "quarterly",
+    curr_date: str = None,
 ) -> str:
     """获取 A股资产负债表。"""
     try:
@@ -185,6 +187,8 @@ def get_balance_sheet(
 
 def get_cashflow(
     ticker: Annotated[str, "股票代码"],
+    freq: str = "quarterly",
+    curr_date: str = None,
 ) -> str:
     """获取 A股现金流数据。"""
     try:
@@ -203,6 +207,8 @@ def get_cashflow(
 
 def get_income_statement(
     ticker: Annotated[str, "股票代码"],
+    freq: str = "quarterly",
+    curr_date: str = None,
 ) -> str:
     """获取 A股利润表数据。"""
     try:
